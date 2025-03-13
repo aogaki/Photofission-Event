@@ -39,10 +39,12 @@ std::vector<std::string> GetFileList(const std::string &directory,
 int main(int argc, char *argv[])
 {
   bool interactionMode = true;
+  std::string settingsFileName = "settings.json";
   if (argc > 1) {
     for (auto i = 1; i < argc; i++) {
       if (std::string(argv[i]) == "-b") {
         interactionMode = false;
+        settingsFileName = argv[i + 1];
       }
     }
   }
@@ -50,7 +52,7 @@ int main(int argc, char *argv[])
   auto nThreads = std::thread::hardware_concurrency();
   std::cout << "Number of threads: " << nThreads << std::endl;
 
-  auto settings = std::ifstream("settings.json");
+  auto settings = std::ifstream(settingsFileName);
   if (!settings.is_open()) {
     std::cerr << "No settings file \"settings.json\" found." << std::endl;
     return 1;
@@ -59,6 +61,7 @@ int main(int argc, char *argv[])
   settings >> jSettings;
 
   std::string directory = jSettings["Directory"];
+  std::string chSettingFileName = jSettings["ChannelSettings"];
   uint32_t runNumber = jSettings["RunNumber"];
   uint32_t startVersion = jSettings["StartVersion"];
   uint32_t endVersion = jSettings["EndVersion"];
@@ -123,7 +126,7 @@ int main(int argc, char *argv[])
     std::cout << "Number of threads: " << nThreads << std::endl;
   }
 
-  auto chSettingsVec = TChSettings::GetChSettings("chSettings.json");
+  auto chSettingsVec = TChSettings::GetChSettings(chSettingFileName);
   if (chSettingsVec.size() == 0) {
     std::cerr << "No channel settings file \"chSettings.json\" found."
               << std::endl;

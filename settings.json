@@ -1,5 +1,6 @@
 {
     "Directory": "/data/E9/",
+    "ChannelSettings": "chSettings.json",
     "RunNumber": 103,
     "StartVersion": 0,
     "EndVersion": 300,
