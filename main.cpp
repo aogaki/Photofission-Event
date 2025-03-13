@@ -19,6 +19,10 @@ std::vector<std::string> GetFileList(const std::string &directory,
                                      const uint32_t endVersion)
 {
   std::vector<std::string> fileList;
+  if (!std::filesystem::exists(directory)) {
+    std::cerr << "Directory not found: " << directory << std::endl;
+    return fileList;
+  }
   for (auto i = startVersion; i <= endVersion; i++) {
     auto searchKey =
         "run" + std::to_string(runNumber) + "_" + std::to_string(i) + "_";
@@ -34,6 +38,15 @@ std::vector<std::string> GetFileList(const std::string &directory,
 
 int main(int argc, char *argv[])
 {
+  bool interactionMode = true;
+  if (argc > 1) {
+    for (auto i = 1; i < argc; i++) {
+      if (std::string(argv[i]) == "-b") {
+        interactionMode = false;
+      }
+    }
+  }
+
   auto nThreads = std::thread::hardware_concurrency();
   std::cout << "Number of threads: " << nThreads << std::endl;
 
@@ -51,41 +64,43 @@ int main(int argc, char *argv[])
   uint32_t endVersion = jSettings["EndVersion"];
   double_t timeWindow = jSettings["TimeWindow"];
 
-  // File specification
-  std::cout << "Input the directory: ";
-  std::cout << "Default: " << directory << std::endl;
-  std::string bufString;
-  std::getline(std::cin, bufString);
-  if (bufString != "") {
-    directory = bufString;
-  }
+  if (interactionMode) {
+    // File specification
+    std::cout << "Input the directory: ";
+    std::cout << "Default: " << directory << std::endl;
+    std::string bufString;
+    std::getline(std::cin, bufString);
+    if (bufString != "") {
+      directory = bufString;
+    }
 
-  std::cout << "Input the run number: ";
-  std::cout << "Default: " << runNumber << std::endl;
-  std::getline(std::cin, bufString);
-  if (bufString != "") {
-    runNumber = std::stoi(bufString);
-  }
+    std::cout << "Input the run number: ";
+    std::cout << "Default: " << runNumber << std::endl;
+    std::getline(std::cin, bufString);
+    if (bufString != "") {
+      runNumber = std::stoi(bufString);
+    }
 
-  std::cout << "Input the start version: ";
-  std::cout << "Default: " << startVersion << std::endl;
-  std::getline(std::cin, bufString);
-  if (bufString != "") {
-    startVersion = std::stoi(bufString);
-  }
+    std::cout << "Input the start version: ";
+    std::cout << "Default: " << startVersion << std::endl;
+    std::getline(std::cin, bufString);
+    if (bufString != "") {
+      startVersion = std::stoi(bufString);
+    }
 
-  std::cout << "Input the end version: ";
-  std::cout << "Default: " << endVersion << std::endl;
-  std::getline(std::cin, bufString);
-  if (bufString != "") {
-    endVersion = std::stoi(bufString);
-  }
+    std::cout << "Input the end version: ";
+    std::cout << "Default: " << endVersion << std::endl;
+    std::getline(std::cin, bufString);
+    if (bufString != "") {
+      endVersion = std::stoi(bufString);
+    }
 
-  std::cout << "Input the time window: +- ";
-  std::cout << "Default: +-" << timeWindow << " ns" << std::endl;
-  std::getline(std::cin, bufString);
-  if (bufString != "") {
-    timeWindow = std::stod(bufString);
+    std::cout << "Input the time window: +- ";
+    std::cout << "Default: +-" << timeWindow << " ns" << std::endl;
+    std::getline(std::cin, bufString);
+    if (bufString != "") {
+      timeWindow = std::stod(bufString);
+    }
   }
 
   std::cout << "Directory: " << directory << std::endl;
@@ -99,6 +114,10 @@ int main(int argc, char *argv[])
   //   std::cout << file << std::endl;
   // }
   std::cout << "Number of files: " << fileList.size() << std::endl;
+  if (fileList.size() == 0) {
+    std::cerr << "No files found." << std::endl;
+    return 1;
+  }
   if (fileList.size() < nThreads) {
     nThreads = fileList.size();
     std::cout << "Number of threads: " << nThreads << std::endl;
