@@ -33,13 +33,26 @@ std::vector<std::string> GetFileList(const std::string dirName)
   return fileList;
 }
 
-TH2D *histTime[17];
+Double_t GetCalibratedEnergy(const ChSettings_t &chSetting, const UShort_t &adc)
+{
+  return chSetting.p0 + chSetting.p1 * adc + chSetting.p2 * adc * adc +
+         chSetting.p3 * adc * adc * adc;
+}
+
+constexpr uint32_t nModules = 9;
+constexpr uint32_t nChannels = 16;
+TH2D *histTime[nChannels + 1];
 TH1D *histSiMultiplicty;
 TH1D *histGammaMultiplicity;
 TH1D *histNeutronMultiplicity;
+TH1D *histADC[nModules][nChannels];
+TH1D *histEnergy[nModules][nChannels];
 void InitHists()
 {
-  for (auto i = 0; i < 17; i++) {
+  auto settingsFileName = "./chSettings.json";
+  auto chSettingsVec = TChSettings::GetChSettings(settingsFileName);
+
+  for (uint32_t i = 0; i < nChannels; i++) {
     histTime[i] =
         new TH2D(Form("histTime_%d", i),
                  Form("Time difference ID%02d and other detectors", i), 20000,
@@ -47,6 +60,9 @@ void InitHists()
     histTime[i]->SetXTitle("[ns]");
     histTime[i]->SetYTitle("Detector ID");
   }
+  histTime[nChannels] =
+      new TH2D("histTime", "Time difference between detectors", 20000, -1000,
+               1000, 151, -0.5, 150.5);
 
   histSiMultiplicty =
       new TH1D("histSiMultiplicity", "Si Multiplicity", 33, -0.5, 32.5);
@@ -59,12 +75,39 @@ void InitHists()
   histNeutronMultiplicity = new TH1D("histNeutronMultiplicity",
                                      "Neutron Multiplicity", 48, -0.5, 47.5);
   histNeutronMultiplicity->SetXTitle("Multiplicity");
-}
 
-Double_t GetCalibratedEnergy(const ChSettings_t &chSetting, const UShort_t &adc)
-{
-  return chSetting.p0 + chSetting.p1 * adc + chSetting.p2 * adc * adc +
-         chSetting.p3 * adc * adc * adc;
+  constexpr uint32_t nBins = 32000;
+  for (uint32_t i = 0; i < nModules; i++) {
+    for (uint32_t j = 0; j < nChannels; j++) {
+      histADC[i][j] = new TH1D(Form("histADC_%d_%d", i, j),
+                               Form("Energy Module%02d Channel%02d", i, j),
+                               nBins, 0.5, nBins + 0.5);
+      histADC[i][j]->SetXTitle("ADC channel");
+    }
+  }
+
+  for (uint32_t i = 0; i < nModules; i++) {
+    for (uint32_t j = 0; j < nChannels; j++) {
+      auto chSetting = chSettingsVec.at(i).at(j);
+      std::array<double_t, nBins + 1> binTable;
+      for (uint16_t k = 0; k < nBins + 1; k++) {
+        auto currentBin = GetCalibratedEnergy(chSetting, k);
+        auto nextBin = GetCalibratedEnergy(chSetting, k + 1);
+        auto nextEdge = (currentBin + nextBin) / 2.;
+        if (k != 0) {
+          auto previousEdge = binTable.at(k - 1);
+          if (nextEdge < previousEdge) {
+            nextEdge = previousEdge + 0.1;
+          }
+        }
+        binTable.at(k) = nextEdge;
+      }
+      histEnergy[i][j] = new TH1D(Form("histEnergy_%d_%d", i, j),
+                                  Form("Energy Module%02d Channel%02d", i, j),
+                                  nBins, binTable.data());
+      histEnergy[i][j]->SetXTitle("Energy [keV]");
+    }
+  }
 }
 
 std::mutex counterMutex;
@@ -126,6 +169,8 @@ void AnalysisThread(TString fileName, uint32_t threadID)
     tree->GetEntry(i);
 
     histSiMultiplicty->Fill(SiMultiplicity);
+    histGammaMultiplicity->Fill(GammaMultiplicity);
+    histNeutronMultiplicity->Fill(NeutronMultiplicity);
 
     auto triggerCh = TriggerID % 16;
     for (uint32_t j = 0; j < Module->size(); j++) {
@@ -139,7 +184,13 @@ void AnalysisThread(TString fileName, uint32_t threadID)
       auto calibratedEnergyShort = GetCalibratedEnergy(chSetting, energyShort);
 
       auto hitID = module * 16 + channel;
-      if (module != 0) histTime[triggerCh]->Fill(timestamp, hitID);
+      if (module != 0) {
+        histTime[triggerCh]->Fill(timestamp, hitID);
+        histTime[16]->Fill(timestamp, hitID);  // Sum of all
+      }
+
+      histADC[module][channel]->Fill(energy);
+      histEnergy[module][channel]->Fill(calibratedEnergy);
     }
 
     constexpr auto nProcess = 1000;
