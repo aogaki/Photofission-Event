@@ -28,7 +28,7 @@ file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hpp)
 file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
 # Copy config files *.conf to build directory
-file(GLOB conf_files ${PROJECT_SOURCE_DIR}/*.json ${PROJECT_SOURCE_DIR}/include/*.hpp ${PROJECT_SOURCE_DIR}/reader.cpp)
+file(GLOB conf_files ${PROJECT_SOURCE_DIR}/*.json ${PROJECT_SOURCE_DIR}/include/*.hpp ${PROJECT_SOURCE_DIR}/macro/*)
 file(COPY ${conf_files} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 # ----------------------------------------------------------------------------

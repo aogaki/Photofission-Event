@@ -58,11 +58,6 @@ uint32_t TEventBuilder::LoadHits()
 
   CheckHitData();
 
-  std::sort(fHitData.begin(), fHitData.end(),
-            [](const HitData_t &a, const HitData_t &b) {
-              return a.Timestamp < b.Timestamp;
-            });
-
   file->Close();
 
   return fHitData.size();
@@ -70,17 +65,32 @@ uint32_t TEventBuilder::LoadHits()
 
 void TEventBuilder::CheckHitData()
 {
-  const double_t timeOffset = (pow(2, 47) - 1) * 2.;
+  const double_t timeOffset = (pow(2, 47) - 1);
   const auto firstTS = fHitData.at(0).Timestamp;
   const auto lastTS = fHitData.at(fHitData.size() - 1).Timestamp;
-  if (lastTS - firstTS > timeOffset / 2.) {
-    std::cout << "Timestamp overflow detected: " << fFileName << std::endl;
-    for (auto &hit : fHitData) {
-      if (hit.Timestamp < timeOffset / 2.) {
-        hit.Timestamp += timeOffset;
+  if (lastTS - firstTS > timeOffset) {
+    std::cout << "Timestamp overflow detected: " << fFileName;
+    std::cout << "\nFirst timestamp: " << firstTS;
+    std::cout << "\nLast timestamp: " << lastTS << std::endl;
+
+    for (auto i = 0; i < fHitData.size() - 1; i++) {
+      auto originalTS = fHitData.at(i).Timestamp;
+      if (fHitData.at(i).Module == 0 || fHitData.at(i).Module == 1) {
+        fHitData.at(i).Timestamp += timeOffset * 4;
+      } else {
+        fHitData.at(i).Timestamp += timeOffset * 2;
+      }
+
+      if (fHitData.at(i + 1).Timestamp - originalTS > timeOffset) {
+        break;
       }
     }
   }
+
+  std::sort(fHitData.begin(), fHitData.end(),
+            [](const HitData_t &a, const HitData_t &b) {
+              return a.Timestamp < b.Timestamp;
+            });
 }
 
 uint32_t TEventBuilder::EventBuild()
