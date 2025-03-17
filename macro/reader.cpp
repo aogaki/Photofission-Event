@@ -1,3 +1,4 @@
+#include <TCanvas.h>
 #include <TChain.h>
 #include <TF1.h>
 #include <TFile.h>
@@ -184,10 +185,10 @@ void AnalysisThread(TString fileName, uint32_t threadID)
       auto calibratedEnergyShort = GetCalibratedEnergy(chSetting, energyShort);
 
       auto hitID = module * 16 + channel;
-      if (module != 0) {
-        histTime[triggerCh]->Fill(timestamp, hitID);
-        histTime[16]->Fill(timestamp, hitID);  // Sum of all
-      }
+      // if (module != 0) {
+      histTime[triggerCh]->Fill(timestamp, hitID);
+      histTime[16]->Fill(timestamp, hitID);  // Sum of all
+      // }
 
       histADC[module][channel]->Fill(energy);
       histEnergy[module][channel]->Fill(calibratedEnergy);
@@ -237,7 +238,7 @@ void reader()
           std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime)
               .count();
       auto remainingTime =
-          (totalEvents - processedEvents) * elapsed / finishedEvents / 1.e3;
+          (totalEvents - finishedEvents) * elapsed / finishedEvents / 1.e3;
 
       std::cout << "\b\r" << "Processing event " << finishedEvents << " / "
                 << totalEvents << ", " << int(remainingTime) << "s  \b\b"
@@ -255,9 +256,32 @@ void reader()
   auto elapsed =
       std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime)
           .count();
+
   std::cout << "\b\r" << "Processing event " << totalEvents << " / "
             << totalEvents << ", spent " << int(elapsed / 1.e3) << "s  \b\b"
             << std::endl;
 
-  histTime[0]->Draw("colz");
+  // Draw all histograms of ADC and Energy
+  TCanvas *cavasADC[nModules];
+  TCanvas *cavasEnergy[nModules];
+  for (uint32_t i = 0; i < nModules; i++) {
+    cavasADC[i] =
+        new TCanvas(Form("cavasADC_%d", i), Form("Module %02d", i), 800, 600);
+    cavasADC[i]->Divide(4, 4);
+    cavasEnergy[i] = new TCanvas(Form("cavasEnergy_%d", i),
+                                 Form("Module %02d", i), 800, 600);
+    cavasEnergy[i]->Divide(4, 4);
+    for (uint32_t j = 0; j < nChannels; j++) {
+      cavasADC[i]->cd(j + 1);
+      histADC[i][j]->Draw();
+      cavasEnergy[i]->cd(j + 1);
+      histEnergy[i][j]->Draw();
+    }
+    // Save as PDF
+    cavasADC[i]->Print(Form("ADC_Module%02d.pdf", i));
+    cavasEnergy[i]->Print(Form("Energy_Module%02d.pdf", i));
+  }
+
+  auto canvas = new TCanvas("canvas", "canvas", 800, 600);
+  histTime[16]->Draw("colz");
 }
