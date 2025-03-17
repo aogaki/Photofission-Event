@@ -121,7 +121,7 @@ void AnalysisThread(TString fileName, uint32_t threadID)
     for (uint32_t i = 0; i < Module->size(); i++) {
       if (Timestamp->at(i) == 0) {
         if (1225 < ADC->at(i) && ADC->at(i) < 1520) {  // For 103
-        // if (1200 < ADC->at(i) && ADC->at(i) < 1485) {  // For 115
+          // if (1200 < ADC->at(i) && ADC->at(i) < 1485) {  // For 115
           isCo = true;
           break;
         }
@@ -132,12 +132,12 @@ void AnalysisThread(TString fileName, uint32_t threadID)
       auto timestamp = Timestamp->at(j);
       if (timestamp == 0) {
         histTriggerADC->Fill(ADC->at(j));
-      }
-      if (isCo) {
+      } else {
         auto module = Module->at(j);
         auto channel = Channel->at(j);
         auto hitID = module * 16 + channel;
-        histTime->Fill(timestamp, hitID);
+        if (isCo || module == 0 || module == 1)
+          histTime->Fill(timestamp, hitID);
       }
     }
   }
@@ -247,11 +247,27 @@ void time_alignment()
       auto fitFunc = histTof.at(i).at(j)->GetFunction("f");
       if (fitFunc) {
         auto mean = fitFunc->GetParameter(1);
-        chSettingsVec.at(i).at(j).timeOffset = mean + tof.at(i).at(j);
+        if (i == 2 && j == 0) mean = 0;  // Event trigger detector
+        chSettingsVec.at(i).at(j).timeOffset = tof.at(i).at(j) - mean;
         std::cout << "Module " << i << ", Channel " << j
                   << ", time offset: " << chSettingsVec.at(i).at(j).timeOffset
                   << std::endl;
       }
     }
   }
+
+  std::ifstream ifs(settingsFileName);
+  nlohmann::json jsonFile;
+  ifs >> jsonFile;
+  for (uint32_t i = 0; i < nModules; i++) {
+    for (uint32_t j = 0; j < nChannels; j++) {
+      jsonFile.at(i).at(j).at("TimeOffset") =
+          chSettingsVec.at(i).at(j).timeOffset;
+    }
+  }
+  ifs.close();
+  auto outputFileName = "./chSettings.json";
+  std::ofstream ofs(outputFileName);
+  ofs << jsonFile.dump(4);
+  ofs.close();
 }

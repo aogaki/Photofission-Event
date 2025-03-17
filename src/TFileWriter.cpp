@@ -88,7 +88,7 @@ void TFileWriter::WriteData()
         fTimestamp.clear();
         fEnergy.clear();
         fEnergyShort.clear();
-        for (auto &hit : event.fHitData) {
+        for (auto &hit : event.HitData) {
           fModule.push_back(hit.Module);
           fChannel.push_back(hit.Channel);
           fTimestamp.push_back(hit.Timestamp);

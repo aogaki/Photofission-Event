@@ -116,7 +116,7 @@ uint32_t TEventBuilder::EventBuild()
 
       auto triggerTime = hit.Timestamp;
       hit.Timestamp -= triggerTime;
-      eventData.fHitData.push_back(hit);
+      eventData.HitData.push_back(hit);
 
       eventData.TriggerID = fSettings.at(hit.Module).at(hit.Channel).detectorID;
       bool fillFlag = true;
@@ -136,7 +136,7 @@ uint32_t TEventBuilder::EventBuild()
         if (nextHit.Timestamp > fTimeWindow) {
           break;
         }
-        eventData.fHitData.push_back(nextHit);
+        eventData.HitData.push_back(nextHit);
       }
 
       for (auto jHit = iHit - 1; (jHit >= 0) && fillFlag; jHit--) {
@@ -155,19 +155,23 @@ uint32_t TEventBuilder::EventBuild()
           break;
         }
 
-        eventData.fHitData.push_back(prevHit);
+        eventData.HitData.push_back(prevHit);
       }
 
       if (fillFlag) {
         // Check the condition for a fission event
-        for (auto &hit : eventData.fHitData) {
+        uint16_t frontADC = 0;
+        uint16_t backADC = 0;
+        for (auto &hit : eventData.HitData) {
           if (hit.Module == 0) {
             eventData.SiMultiplicity++;
             eventData.SiFrontMultiplicity++;
+            frontADC = std::max(frontADC, hit.Energy);
           }
           if (hit.Module == 1) {
             eventData.SiMultiplicity++;
             eventData.SiBackMultiplicity++;
+            backADC = std::max(backADC, hit.Energy);
           }
           if (hit.Module == 2 || hit.Module == 3 || hit.Module == 4) {
             eventData.GammaMultiplicity++;
@@ -179,7 +183,8 @@ uint32_t TEventBuilder::EventBuild()
           }
         }
         eventData.IsFissionEvent = (eventData.SiFrontMultiplicity > 0) &&
-                                   (eventData.SiBackMultiplicity > 0);
+                                   (eventData.SiBackMultiplicity > 0) &&
+                                   (frontADC > 1500.0) && (backADC > 1500.0);
 
         fEventData->push_back(eventData);
       }

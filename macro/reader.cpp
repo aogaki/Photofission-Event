@@ -262,25 +262,25 @@ void reader()
             << std::endl;
 
   // Draw all histograms of ADC and Energy
-  TCanvas *cavasADC[nModules];
-  TCanvas *cavasEnergy[nModules];
-  for (uint32_t i = 0; i < nModules; i++) {
-    cavasADC[i] =
-        new TCanvas(Form("cavasADC_%d", i), Form("Module %02d", i), 800, 600);
-    cavasADC[i]->Divide(4, 4);
-    cavasEnergy[i] = new TCanvas(Form("cavasEnergy_%d", i),
-                                 Form("Module %02d", i), 800, 600);
-    cavasEnergy[i]->Divide(4, 4);
-    for (uint32_t j = 0; j < nChannels; j++) {
-      cavasADC[i]->cd(j + 1);
-      histADC[i][j]->Draw();
-      cavasEnergy[i]->cd(j + 1);
-      histEnergy[i][j]->Draw();
-    }
-    // Save as PDF
-    cavasADC[i]->Print(Form("ADC_Module%02d.pdf", i));
-    cavasEnergy[i]->Print(Form("Energy_Module%02d.pdf", i));
-  }
+  // TCanvas *cavasADC[nModules];
+  // TCanvas *cavasEnergy[nModules];
+  // for (uint32_t i = 0; i < nModules; i++) {
+  //   cavasADC[i] =
+  //       new TCanvas(Form("cavasADC_%d", i), Form("Module %02d", i), 800, 600);
+  //   cavasADC[i]->Divide(4, 4);
+  //   cavasEnergy[i] = new TCanvas(Form("cavasEnergy_%d", i),
+  //                                Form("Module %02d", i), 800, 600);
+  //   cavasEnergy[i]->Divide(4, 4);
+  //   for (uint32_t j = 0; j < nChannels; j++) {
+  //     cavasADC[i]->cd(j + 1);
+  //     histADC[i][j]->Draw();
+  //     cavasEnergy[i]->cd(j + 1);
+  //     histEnergy[i][j]->Draw();
+  //   }
+  //   // Save as PDF
+  //   cavasADC[i]->Print(Form("ADC_Module%02d.pdf", i));
+  //   cavasEnergy[i]->Print(Form("Energy_Module%02d.pdf", i));
+  // }
 
   auto canvas = new TCanvas("canvas", "canvas", 800, 600);
   histTime[16]->Draw("colz");

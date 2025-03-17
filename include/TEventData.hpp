@@ -37,7 +37,7 @@ class TEventData
   uint8_t SiMultiplicity;
   uint8_t GammaMultiplicity;
   uint8_t NeutronMultiplicity;
-  std::vector<HitData_t> fHitData;
+  std::vector<HitData_t> HitData;
 };
 
 #endif

@@ -23,7 +23,7 @@ void gen_no_timeoffset()
     }
   }
 
-  std::ofstream out("chSettings_no_timeoffset.json");
+  std::ofstream out("chSettings.json");
   out << jSettings.dump(4) << std::endl;
   out.close();
 }
