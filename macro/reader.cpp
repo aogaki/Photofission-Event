@@ -48,6 +48,8 @@ TH1D *histGammaMultiplicity;
 TH1D *histNeutronMultiplicity;
 TH1D *histADC[nModules][nChannels];
 TH1D *histEnergy[nModules][nChannels];
+TH2D *histADCvsTime[nModules][nChannels];
+TH2D *histPSDvsTime[nModules][nChannels];
 void InitHists()
 {
   auto settingsFileName = "./chSettings.json";
@@ -109,6 +111,28 @@ void InitHists()
       histEnergy[i][j]->SetXTitle("Energy [keV]");
     }
   }
+
+  for (uint32_t i = 0; i < nModules; i++) {
+    for (uint32_t j = 0; j < nChannels; j++) {
+      histADCvsTime[i][j] =
+          new TH2D(Form("histADCvsTime_%d_%d", i, j),
+                   Form("Energy vs Time Module%02d Channel%02d", i, j), 2000,
+                   -1000, 1000, nBins / 10, 0.5, nBins + 0.5);
+      histADCvsTime[i][j]->SetXTitle("Time [ns]");
+      histADCvsTime[i][j]->SetYTitle("ADC channel");
+    }
+  }
+
+  for (uint32_t i = 0; i < nModules; i++) {
+    for (uint32_t j = 0; j < nChannels; j++) {
+      histPSDvsTime[i][j] =
+          new TH2D(Form("histPSDvsTime_%d_%d", i, j),
+                   Form("PSD vs Time Module%02d Channel%02d", i, j), 2000,
+                   -1000, 1000, 1000, 0, 1);
+      histPSDvsTime[i][j]->SetXTitle("Time [ns]");
+      histPSDvsTime[i][j]->SetYTitle("PSD");
+    }
+  }
 }
 
 std::mutex counterMutex;
@@ -168,36 +192,41 @@ void AnalysisThread(TString fileName, uint32_t threadID)
 
   for (auto i = 0; i < nEntries; i++) {
     tree->GetEntry(i);
-
-    histSiMultiplicty->Fill(SiMultiplicity);
-    histGammaMultiplicity->Fill(GammaMultiplicity);
-    histNeutronMultiplicity->Fill(NeutronMultiplicity);
-
-    auto triggerCh = TriggerID % 16;
-    for (uint32_t j = 0; j < Module->size(); j++) {
-      auto module = Module->at(j);
-      auto channel = Channel->at(j);
-      auto timestamp = Timestamp->at(j);
-      auto energy = Energy->at(j);
-      auto energyShort = EnergyShort->at(j);
-      auto chSetting = chSettingsVec.at(module).at(channel);
-      auto calibratedEnergy = GetCalibratedEnergy(chSetting, energy);
-      auto calibratedEnergyShort = GetCalibratedEnergy(chSetting, energyShort);
-
-      auto hitID = module * 16 + channel;
-      // if (module != 0) {
-      histTime[triggerCh]->Fill(timestamp, hitID);
-      histTime[16]->Fill(timestamp, hitID);  // Sum of all
-      // }
-
-      histADC[module][channel]->Fill(energy);
-      histEnergy[module][channel]->Fill(calibratedEnergy);
-    }
-
     constexpr auto nProcess = 1000;
     if (i % nProcess == 0) {
       std::lock_guard<std::mutex> lock(counterMutex);
       processedEvents += nProcess;
+    }
+
+    if (IsFissionEvent) {
+      histSiMultiplicty->Fill(SiMultiplicity);
+      histGammaMultiplicity->Fill(GammaMultiplicity);
+      histNeutronMultiplicity->Fill(NeutronMultiplicity);
+
+      auto triggerCh = TriggerID % 16;
+      for (uint32_t j = 0; j < Module->size(); j++) {
+        auto module = Module->at(j);
+        auto channel = Channel->at(j);
+        auto timestamp = Timestamp->at(j);
+        auto energy = Energy->at(j);
+        auto energyShort = EnergyShort->at(j);
+        auto chSetting = chSettingsVec.at(module).at(channel);
+        auto calibratedEnergy = GetCalibratedEnergy(chSetting, energy);
+        auto calibratedEnergyShort =
+            GetCalibratedEnergy(chSetting, energyShort);
+        auto psd = double(energy - energyShort) / double(energy + energyShort);
+
+        auto hitID = module * 16 + channel;
+        // if (module != 0) {
+        histTime[triggerCh]->Fill(timestamp, hitID);
+        histTime[16]->Fill(timestamp, hitID);  // Sum of all
+        // }
+
+        histADC[module][channel]->Fill(energy);
+        histEnergy[module][channel]->Fill(calibratedEnergy);
+        histADCvsTime[module][channel]->Fill(timestamp, energy);
+        histPSDvsTime[module][channel]->Fill(timestamp, psd);
+      }
     }
   }
 
