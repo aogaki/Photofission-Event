@@ -2,6 +2,8 @@
 #include <TChain.h>
 #include <TF1.h>
 #include <TFile.h>
+#include <TGraph.h>
+#include <TGraphErrors.h>
 #include <TH1.h>
 #include <TH2.h>
 #include <TROOT.h>
@@ -34,35 +36,42 @@ std::vector<std::string> GetFileList(const std::string dirName)
   return fileList;
 }
 
-constexpr uint32_t nModules = 9;
+constexpr uint32_t nModules = 1;
 constexpr uint32_t nChannels = 16;
-TH2D *histTime;
-TH1D *histTriggerADC;
+TH2D *histTimeADC[nModules][nChannels];
 void InitHists()
 {
-  histTime = new TH2D("histTime", "Time difference between detectors", 20000,
-                      -1000, 1000, 151, -0.5, 150.5);
-
-  histTriggerADC =
-      new TH1D("histTriggerADC", "Trigger ADC", 32000, 0.5, 32000.5);
+  for (uint32_t i = 0; i < nModules; i++) {
+    for (uint32_t j = 0; j < nChannels; j++) {
+      histTimeADC[i][j] = new TH2D(Form("histTimeADC_%d_%d", i, j),
+                                   Form("Module %d, Channel %d", i, j), 250,
+                                   -1000, 1000, 500, 2000.5, 12000.5);
+      histTimeADC[i][j]->GetXaxis()->SetTitle("Time (ns)");
+      histTimeADC[i][j]->GetYaxis()->SetTitle("ADC");
+    }
+  }
 }
 
-void FitHist(TH1D *hist)
+TGraphErrors *GetTimeGraph(std::vector<TH1D *> histVec,
+                           Double_t timeOffset = 0.0)
 {
-  if (hist->GetEntries() == 0) {
-    return;
+  auto nData = histVec.size();
+  auto graph = new TGraphErrors(nData);
+  for (uint32_t i = 0; i < nData; i++) {
+    auto hist = histVec.at(i);
+    auto maxBin = hist->GetMaximumBin();
+    auto binCenter = hist->GetXaxis()->GetBinCenter(maxBin);
+    auto f1 =
+        new TF1(Form("f1%100d", i), "gaus", binCenter - 10, binCenter + 10);
+    hist->Fit(f1, "QR");
+    auto x = std::stoi(hist->GetTitle());
+    auto y = f1->GetParameter(1) + timeOffset;
+    auto yError = f1->GetParError(2);
+
+    graph->SetPoint(i, x, y);
+    graph->SetPointError(i, 0, yError);
   }
-  auto mean = hist->GetBinCenter(hist->GetMaximumBin());
-  // auto sigma = hist->GetRMS();
-  auto sigma = 2;
-  auto f = new TF1("f", "gaus", mean - 1 * sigma, mean + 1 * sigma);
-  f->SetParameters(hist->GetMaximum(), mean, sigma);
-  hist->Fit(f, "QR", "", mean - 1 * sigma, mean + 1 * sigma);
-
-  f->SetRange(mean - 1 * sigma, mean + 1 * sigma);
-  hist->Fit(f, "QR", "", mean - 1 * sigma, mean + 1 * sigma);
-
-  hist->GetXaxis()->SetRangeUser(mean - 5 * sigma, mean + 5 * sigma);
+  return graph;
 }
 
 std::mutex counterMutex;
@@ -90,6 +99,9 @@ void AnalysisThread(TString fileName, uint32_t threadID)
   }
   tree->SetBranchStatus("*", kFALSE);
 
+  bool IsFissionEvent;
+  tree->SetBranchStatus("IsFissionEvent", kTRUE);
+  tree->SetBranchAddress("IsFissionEvent", &IsFissionEvent);
   std::vector<uint8_t> *Module = nullptr;
   tree->SetBranchStatus("Module", kTRUE);
   tree->SetBranchAddress("Module", &Module);
@@ -117,21 +129,25 @@ void AnalysisThread(TString fileName, uint32_t threadID)
     }
     tree->GetEntry(i);
 
+    if (!IsFissionEvent) {
+      continue;
+    }
+
     for (uint32_t j = 0; j < Module->size(); j++) {
       auto timestamp = Timestamp->at(j);
-      if (timestamp == 0) {
-        histTriggerADC->Fill(ADC->at(j));
-      }
       auto module = Module->at(j);
       auto channel = Channel->at(j);
-      auto hitID = module * 16 + channel;
-      histTime->Fill(timestamp, hitID);
+      auto adc = ADC->at(j);
+      if (module < nModules && channel < nChannels && timestamp != 0) {
+        histTimeADC[module][channel]->Fill(timestamp, adc);
+      }
     }
   }
 
   IsFinished.at(threadID) = true;
 }
 
+std::vector<TGraphErrors *> graphVec;
 void time_alignment_Si()
 {
   ROOT::EnableThreadSafety();
@@ -188,73 +204,46 @@ void time_alignment_Si()
             << totalEvents << ", spent " << int(elapsed / 1.e3) << "s  \b\b"
             << std::endl;
 
-  // auto settingsFileName = "./chSettings_no_timeoffset.json";
-  auto settingsFileName = "./chSettings_gamma.json";
-  auto chSettingsVec = TChSettings::GetChSettings(settingsFileName);
+  auto settingsFileName = "./chSettings.json";
+  std::ifstream ifs(settingsFileName);
+  nlohmann::json jsonFile;
+  ifs >> jsonFile;
+  for (uint32_t j = 0; j < nChannels; j++) {
+    std::vector<TH1D *> histTimeVec;
 
-  constexpr double_t lightSpeed = 29.9792458;  // cm/ns
-  std::vector<std::vector<double_t>> tof(nModules,
-                                         std::vector<double_t>(nChannels));
-  for (uint32_t i = 0; i < nModules; i++) {
-    for (uint32_t j = 0; j < nChannels; j++) {
-      tof.at(i).at(j) = chSettingsVec.at(i).at(j).distance / lightSpeed;
+    const auto nBins = histTimeADC[0][j]->GetNbinsY();
+    const auto maxBinContent = histTimeADC[0][j]->ProjectionX()->GetMaximum();
+    auto timeOffset = jsonFile.at(0).at(j).at("TimeOffset").get<double>();
+    for (auto i = 1; i <= nBins; i++) {
+      auto hist = histTimeADC[0][j]->ProjectionX(Form("histTime_%d", i), i, i);
+      if (hist->GetEntries() > 0.01 * maxBinContent) {
+        auto binCenter = histTimeADC[0][j]->GetYaxis()->GetBinCenter(i);
+        hist->SetTitle(Form("%.0f", binCenter));
+        histTimeVec.push_back(hist);
+      }
     }
-  }
+    auto graph = GetTimeGraph(histTimeVec, timeOffset);
+    auto f2 = new TF1(Form("f2_%d", j), "pol1", 0, 30000);
+    graph->Fit(f2, "QR");
+    graph->Draw("AP");
 
-  std::vector<std::vector<TH1D *>> histTof(nModules,
-                                           std::vector<TH1D *>(nChannels));
-  for (uint32_t i = 0; i < nModules; i++) {
-    for (uint32_t j = 0; j < nChannels; j++) {
-      histTof.at(i).at(j) = histTime->ProjectionX(
-          Form("histTof_%d_%d", i, j), i * 16 + j + 1, i * 16 + j + 1);
-      histTof.at(i).at(j)->SetTitle(
-          Form("Time of flight for Module %d, Channel %d", i, j));
-      histTof.at(i).at(j)->GetXaxis()->SetTitle("Time of flight (ns)");
-    }
-  }
-
-  for (uint32_t i = 0; i < nModules; i++) {
-    for (uint32_t j = 0; j < nChannels; j++) {
-      FitHist(histTof.at(i).at(j));
-    }
+    graphVec.push_back(graph);
   }
 
   auto canvas = new TCanvas("canvas", "canvas", 800, 600);
   canvas->Divide(4, 4);
-  for (uint32_t i = 0; i < nModules; i++) {
-    for (uint32_t j = 0; j < nChannels; j++) {
-      canvas->cd(j + 1);
-      histTof.at(i).at(j)->Draw();
-    }
-    canvas->SaveAs(Form("histTof_%d.pdf", i), "pdf");
-  }
-  delete canvas;
-
-  for (uint32_t i = 0; i < 2; i++) {
-    for (uint32_t j = 0; j < nChannels; j++) {
-      auto fitFunc = histTof.at(i).at(j)->GetFunction("f");
-      if (fitFunc) {
-        auto mean = fitFunc->GetParameter(1);
-        chSettingsVec.at(i).at(j).timeOffset = tof.at(i).at(j) - mean;
-        std::cout << "Module " << i << ", Channel " << j
-                  << ", time offset: " << chSettingsVec.at(i).at(j).timeOffset
-                  << std::endl;
-      }
-    }
+  for (uint32_t i = 0; i < graphVec.size(); i++) {
+    canvas->cd(i + 1);
+    graphVec.at(i)->Draw("AP");
   }
 
-  std::ifstream ifs(settingsFileName);
-  nlohmann::json jsonFile;
-  ifs >> jsonFile;
-  for (uint32_t i = 0; i < 2; i++) {
-    for (uint32_t j = 0; j < nChannels; j++) {
-      jsonFile.at(i).at(j).at("TimeOffset") =
-          chSettingsVec.at(i).at(j).timeOffset;
-    }
+  std::string outName = "Si_time_function.txt";
+  std::ofstream outFile(outName);
+  for (uint32_t i = 0; i < graphVec.size(); i++) {
+    auto graph = graphVec.at(i);
+    outFile << i << " " << graph->GetFunction(Form("f2_%d", i))->GetParameter(0)
+            << " " << graph->GetFunction(Form("f2_%d", i))->GetParameter(1)
+            << std::endl;
   }
-  ifs.close();
-  auto outputFileName = "./chSettings.json";
-  std::ofstream ofs(outputFileName);
-  ofs << jsonFile.dump(4);
-  ofs.close();
+  outFile.close();
 }

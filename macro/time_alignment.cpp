@@ -47,6 +47,24 @@ void InitHists()
       new TH1D("histTriggerADC", "Trigger ADC", 32000, 0.5, 32000.5);
 }
 
+void FitSiHist(TH1D *hist)
+{
+  if (hist->GetEntries() == 0) {
+    return;
+  }
+  auto mean = hist->GetBinCenter(hist->GetMaximumBin());
+  // auto sigma = hist->GetRMS();
+  auto sigma = 20;
+  auto f = new TF1("f", "gaus", mean - 1 * sigma, mean + 1 * sigma);
+  f->SetParameters(hist->GetMaximum(), mean, sigma);
+  hist->Fit(f, "QR", "", mean - 1 * sigma, mean + 1 * sigma);
+
+  f->SetRange(mean - 1 * sigma, mean + 1 * sigma);
+  hist->Fit(f, "QR", "", mean - 1 * sigma, mean + 1 * sigma);
+
+  hist->GetXaxis()->SetRangeUser(mean - 5 * sigma, mean + 5 * sigma);
+}
+
 void FitHist(TH1D *hist)
 {
   if (hist->GetEntries() == 0) {
@@ -103,7 +121,7 @@ void AnalysisThread(TString fileName, uint32_t threadID)
   tree->SetBranchStatus("Energy", kTRUE);
   tree->SetBranchAddress("Energy", &ADC);
 
-  const auto nEntries = tree->GetEntries();
+  const auto nEntries = tree->GetEntries() / 10;
   {
     std::lock_guard<std::mutex> lock(counterMutex);
     totalEvents += nEntries;
@@ -227,7 +245,10 @@ void time_alignment()
 
   for (uint32_t i = 0; i < nModules; i++) {
     for (uint32_t j = 0; j < nChannels; j++) {
-      FitHist(histTof.at(i).at(j));
+      if (i < 2)
+        FitSiHist(histTof.at(i).at(j));
+      else
+        FitHist(histTof.at(i).at(j));
     }
   }
 
@@ -247,6 +268,7 @@ void time_alignment()
       auto fitFunc = histTof.at(i).at(j)->GetFunction("f");
       if (fitFunc) {
         auto mean = fitFunc->GetParameter(1);
+        if (i < 2) mean = histTof.at(i).at(j)->GetMean();
         if (i == 2 && j == 0) mean = 0;  // Event trigger detector
         chSettingsVec.at(i).at(j).timeOffset = tof.at(i).at(j) - mean;
         std::cout << "Module " << i << ", Channel " << j
@@ -263,6 +285,10 @@ void time_alignment()
     for (uint32_t j = 0; j < nChannels; j++) {
       jsonFile.at(i).at(j).at("TimeOffset") =
           chSettingsVec.at(i).at(j).timeOffset;
+      if (i == 0)
+        jsonFile.at(i).at(j).at("IsEventTrigger") = true;
+      else
+        jsonFile.at(i).at(j).at("IsEventTrigger") = false;
     }
   }
   ifs.close();

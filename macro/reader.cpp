@@ -214,7 +214,7 @@ void AnalysisThread(TString fileName, uint32_t threadID)
         auto calibratedEnergy = GetCalibratedEnergy(chSetting, energy);
         auto calibratedEnergyShort =
             GetCalibratedEnergy(chSetting, energyShort);
-        auto psd = double(energy - energyShort) / double(energy + energyShort);
+        auto psd = double(energy - energyShort) / double(energy);
 
         auto hitID = module * 16 + channel;
         // if (module != 0) {
