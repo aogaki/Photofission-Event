@@ -33,3 +33,6 @@
 
 build
 run*
+
+.vscode
+.DS_Store
