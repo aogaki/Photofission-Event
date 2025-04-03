@@ -1,8 +1,10 @@
 {
     "Directory": "/data/E9/",
     "ChannelSettings": "chSettings.json",
+    "OnlyFissionEvent": true,
+    "NumberOfThreads": 0,
     "RunNumber": 103,
     "StartVersion": 0,
     "EndVersion": 300,
-    "TimeWindow": 200
+    "TimeWindow": 1000
 }

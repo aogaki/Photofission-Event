@@ -12,6 +12,7 @@ class TEventBuilder
 {
  public:
   TEventBuilder(const std::string &fileName, const double_t timeWindow,
+                bool onlyFissionEvents,
                 const std::vector<std::vector<TChSettings>> &settings);
   ~TEventBuilder();
 
@@ -33,6 +34,7 @@ class TEventBuilder
   std::string fFileName;
   std::vector<std::vector<TChSettings>> fSettings;
   double_t fTimeWindow = 1000.0;  // ns
+  bool fOnlyFissionEvents = false;
 };
 
 #endif

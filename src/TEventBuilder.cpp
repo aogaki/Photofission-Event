@@ -8,8 +8,12 @@
 
 TEventBuilder::TEventBuilder(
     const std::string &fileName, const double_t timeWindow,
+    bool onlyFissionEvents,
     const std::vector<std::vector<TChSettings>> &settings)
-    : fFileName(fileName), fTimeWindow(timeWindow), fSettings(settings)
+    : fFileName(fileName),
+      fTimeWindow(timeWindow),
+      fOnlyFissionEvents(onlyFissionEvents),
+      fSettings(settings)
 {
 }
 
@@ -186,7 +190,13 @@ uint32_t TEventBuilder::EventBuild()
                                    (eventData.SiBackMultiplicity > 0) &&
                                    (frontADC > 1500.0) && (backADC > 1500.0);
 
-        fEventData->push_back(eventData);
+        if (fOnlyFissionEvents) {
+          if (eventData.IsFissionEvent) {
+            fEventData->push_back(eventData);
+          }
+        } else {
+          fEventData->push_back(eventData);
+        }
       }
     }
   }

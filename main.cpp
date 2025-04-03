@@ -49,8 +49,8 @@ int main(int argc, char *argv[])
     }
   }
 
-  auto nThreads = std::thread::hardware_concurrency();
-  std::cout << "Number of threads: " << nThreads << std::endl;
+  // auto nThreads = std::thread::hardware_concurrency();
+  // std::cout << "Number of threads: " << nThreads << std::endl;
 
   auto settings = std::ifstream(settingsFileName);
   if (!settings.is_open()) {
@@ -60,12 +60,90 @@ int main(int argc, char *argv[])
   nlohmann::json jSettings;
   settings >> jSettings;
 
-  std::string directory = jSettings["Directory"];
-  std::string chSettingFileName = jSettings["ChannelSettings"];
-  uint32_t runNumber = jSettings["RunNumber"];
-  uint32_t startVersion = jSettings["StartVersion"];
-  uint32_t endVersion = jSettings["EndVersion"];
-  double_t timeWindow = jSettings["TimeWindow"];
+  // std::string directory = jSettings["Directory"];
+  // std::string chSettingFileName = jSettings["ChannelSettings"];
+  // uint32_t runNumber = jSettings["RunNumber"];
+  // uint32_t startVersion = jSettings["StartVersion"];
+  // uint32_t endVersion = jSettings["EndVersion"];
+  // double_t timeWindow = jSettings["TimeWindow"];
+
+  std::string directory = "";
+  //check if directory is empty
+  if (jSettings["Directory"].is_string()) {
+    directory = jSettings["Directory"];
+  } else {
+    std::cerr << "No directory found in settings file." << std::endl;
+    std::cerr << "Key \"Directory\" is not a string." << std::endl;
+    return 1;
+  }
+
+  std::string chSettingFileName = "";
+  if (jSettings["ChannelSettings"].is_string()) {
+    chSettingFileName = jSettings["ChannelSettings"];
+  } else {
+    std::cerr << "No channel settings file found in settings file."
+              << std::endl;
+    std::cerr << "Key \"ChannelSettings\" is not a string." << std::endl;
+    return 1;
+  }
+
+  bool onlyFissionEvents = false;
+  if (jSettings["OnlyFissionEvent"].is_boolean()) {
+    onlyFissionEvents = jSettings["OnlyFissionEvent"];
+  } else {
+    std::cerr << "No only fission event flag found in settings file."
+              << std::endl;
+    std::cerr << "Key \"OnlyFissionEvent\" is not a boolean." << std::endl;
+    return 1;
+  }
+
+  uint32_t nThreads = 0;
+  if (jSettings["NumberOfThreads"].is_number_integer()) {
+    nThreads = jSettings["NumberOfThreads"];
+  } else {
+    std::cerr << "No number of threads found in settings file." << std::endl;
+    std::cerr << "Key \"NumberOfThreads\" is not a number." << std::endl;
+    return 1;
+  }
+  if (nThreads == 0) {
+    nThreads = std::thread::hardware_concurrency();
+  }
+
+  uint32_t runNumber = 0;
+  if (jSettings["RunNumber"].is_number_integer()) {
+    runNumber = jSettings["RunNumber"];
+  } else {
+    std::cerr << "No run number found in settings file." << std::endl;
+    std::cerr << "Key \"RunNumber\" is not a number." << std::endl;
+    return 1;
+  }
+
+  uint32_t startVersion = 0;
+  if (jSettings["StartVersion"].is_number_integer()) {
+    startVersion = jSettings["StartVersion"];
+  } else {
+    std::cerr << "No start version found in settings file." << std::endl;
+    std::cerr << "Key \"StartVersion\" is not a number." << std::endl;
+    return 1;
+  }
+
+  uint32_t endVersion = 0;
+  if (jSettings["EndVersion"].is_number_integer()) {
+    endVersion = jSettings["EndVersion"];
+  } else {
+    std::cerr << "No end version found in settings file." << std::endl;
+    std::cerr << "Key \"EndVersion\" is not a number." << std::endl;
+    return 1;
+  }
+
+  uint32_t timeWindow = 0;
+  if (jSettings["TimeWindow"].is_number_integer()) {
+    timeWindow = jSettings["TimeWindow"];
+  } else {
+    std::cerr << "No time window found in settings file." << std::endl;
+    std::cerr << "Key \"TimeWindow\" is not a number." << std::endl;
+    return 1;
+  }
 
   if (interactionMode) {
     // File specification
@@ -103,6 +181,37 @@ int main(int argc, char *argv[])
     std::getline(std::cin, bufString);
     if (bufString != "") {
       timeWindow = std::stod(bufString);
+    }
+
+    while (true) {
+      std::cout << "Input only fission event flag: [y/n]";
+      std::string onlyFissionEventString;
+      if (onlyFissionEvents) {
+        onlyFissionEventString = "y";
+      } else {
+        onlyFissionEventString = "n";
+      }
+      std::getline(std::cin, bufString);
+      if (bufString == "y") {
+        onlyFissionEvents = true;
+        break;
+      } else if (bufString == "n") {
+        onlyFissionEvents = false;
+        break;
+      } else {
+        std::cerr << "Invalid input. Only \"y\" or \"n\" are accepted."
+                  << std::endl;
+      }
+    }
+
+    std::cout << "Input the number of threads: ";
+    std::cout << "Default: " << nThreads << std::endl;
+    std::getline(std::cin, bufString);
+    if (bufString != "") {
+      nThreads = std::stoi(bufString);
+    }
+    if (nThreads == 0) {
+      nThreads = std::thread::hardware_concurrency();
     }
   }
 
@@ -156,7 +265,8 @@ int main(int argc, char *argv[])
         fileList.erase(fileList.begin());
         mutex.unlock();
 
-        TEventBuilder eventBuilder(fileName, timeWindow, chSettingsVec);
+        TEventBuilder eventBuilder(fileName, timeWindow, onlyFissionEvents,
+                                   chSettingsVec);
         auto nHits = eventBuilder.LoadHits();
         mutex.lock();
         std::cout << "Number of hits from " << fileName << " : " << nHits
