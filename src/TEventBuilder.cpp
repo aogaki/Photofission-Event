@@ -117,10 +117,30 @@ uint32_t TEventBuilder::EventBuild()
       eventData.SiMultiplicity = 0;
       eventData.GammaMultiplicity = 0;
       eventData.NeutronMultiplicity = 0;
+      uint16_t frontADC = 0;
+      uint16_t backADC = 0;
 
       auto triggerTime = hit.Timestamp;
       hit.Timestamp -= triggerTime;
       eventData.HitData.push_back(hit);
+      if (hit.Module == 0) {
+        eventData.SiMultiplicity++;
+        eventData.SiFrontMultiplicity++;
+        frontADC = std::max(frontADC, hit.Energy);
+      }
+      if (hit.Module == 1) {
+        eventData.SiMultiplicity++;
+        eventData.SiBackMultiplicity++;
+        backADC = std::max(backADC, hit.Energy);
+      }
+      if (hit.Module == 2 || hit.Module == 3 || hit.Module == 4) {
+        eventData.GammaMultiplicity++;
+      }
+
+      if (hit.Module == 5 || hit.Module == 6 || hit.Module == 7 ||
+          hit.Module == 8 || hit.Module == 9) {
+        eventData.NeutronMultiplicity++;
+      }
 
       eventData.TriggerID = fSettings.at(hit.Module).at(hit.Channel).detectorID;
       bool fillFlag = true;
@@ -140,6 +160,25 @@ uint32_t TEventBuilder::EventBuild()
         if (nextHit.Timestamp > fTimeWindow) {
           break;
         }
+
+        if (nextHit.Module == 0) {
+          eventData.SiMultiplicity++;
+          eventData.SiFrontMultiplicity++;
+          frontADC = std::max(frontADC, nextHit.Energy);
+        }
+        if (nextHit.Module == 1) {
+          eventData.SiMultiplicity++;
+          eventData.SiBackMultiplicity++;
+          backADC = std::max(backADC, nextHit.Energy);
+        }
+        if (nextHit.Module == 2 || nextHit.Module == 3 || nextHit.Module == 4) {
+          eventData.GammaMultiplicity++;
+        }
+        if (nextHit.Module == 5 || nextHit.Module == 6 || nextHit.Module == 7 ||
+            nextHit.Module == 8 || nextHit.Module == 9) {
+          eventData.NeutronMultiplicity++;
+        }
+
         eventData.HitData.push_back(nextHit);
       }
 
@@ -159,33 +198,29 @@ uint32_t TEventBuilder::EventBuild()
           break;
         }
 
+        if (prevHit.Module == 0) {
+          eventData.SiMultiplicity++;
+          eventData.SiFrontMultiplicity++;
+          frontADC = std::max(frontADC, prevHit.Energy);
+        }
+        if (prevHit.Module == 1) {
+          eventData.SiMultiplicity++;
+          eventData.SiBackMultiplicity++;
+          backADC = std::max(backADC, prevHit.Energy);
+        }
+        if (prevHit.Module == 2 || prevHit.Module == 3 || prevHit.Module == 4) {
+          eventData.GammaMultiplicity++;
+        }
+
+        if (prevHit.Module == 5 || prevHit.Module == 6 || prevHit.Module == 7 ||
+            prevHit.Module == 8 || prevHit.Module == 9) {
+          eventData.NeutronMultiplicity++;
+        }
+
         eventData.HitData.push_back(prevHit);
       }
 
       if (fillFlag) {
-        // Check the condition for a fission event
-        uint16_t frontADC = 0;
-        uint16_t backADC = 0;
-        for (auto &hit : eventData.HitData) {
-          if (hit.Module == 0) {
-            eventData.SiMultiplicity++;
-            eventData.SiFrontMultiplicity++;
-            frontADC = std::max(frontADC, hit.Energy);
-          }
-          if (hit.Module == 1) {
-            eventData.SiMultiplicity++;
-            eventData.SiBackMultiplicity++;
-            backADC = std::max(backADC, hit.Energy);
-          }
-          if (hit.Module == 2 || hit.Module == 3 || hit.Module == 4) {
-            eventData.GammaMultiplicity++;
-          }
-
-          if (hit.Module == 5 || hit.Module == 6 || hit.Module == 7 ||
-              hit.Module == 8 || hit.Module == 9) {
-            eventData.NeutronMultiplicity++;
-          }
-        }
         eventData.IsFissionEvent = (eventData.SiFrontMultiplicity > 0) &&
                                    (eventData.SiBackMultiplicity > 0) &&
                                    (frontADC > 1500.0) && (backADC > 1500.0);
