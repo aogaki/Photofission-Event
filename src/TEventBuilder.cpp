@@ -97,6 +97,22 @@ void TEventBuilder::CheckHitData()
             });
 }
 
+HitType_t TEventBuilder::GetHitType(uint8_t module)
+{
+  if (module == 0) {
+    return HitType::SiFront;
+  } else if (module == 1) {
+    return HitType::SiBack;
+  } else if (module >= 2 && module <= 4) {
+    return HitType::Gamma;
+  } else if (module >= 5 && module <= 9) {
+    return HitType::Neutron;
+  } else {
+    std::cout << "Unknown module: " << static_cast<int>(module) << std::endl;
+  }
+  return HitType::Unknown;
+}
+
 uint32_t TEventBuilder::EventBuild()
 {
   if (fHitData.size() == 0) {
@@ -123,22 +139,18 @@ uint32_t TEventBuilder::EventBuild()
       auto triggerTime = hit.Timestamp;
       hit.Timestamp -= triggerTime;
       eventData.HitData.push_back(hit);
-      if (hit.Module == 0) {
+      auto hitType = GetHitType(hit.Module);
+      if (hitType == HitType::SiFront) {
         eventData.SiMultiplicity++;
         eventData.SiFrontMultiplicity++;
         frontADC = std::max(frontADC, hit.Energy);
-      }
-      if (hit.Module == 1) {
+      } else if (hitType == HitType::SiBack) {
         eventData.SiMultiplicity++;
         eventData.SiBackMultiplicity++;
         backADC = std::max(backADC, hit.Energy);
-      }
-      if (hit.Module == 2 || hit.Module == 3 || hit.Module == 4) {
+      } else if (hitType == HitType::Gamma) {
         eventData.GammaMultiplicity++;
-      }
-
-      if (hit.Module == 5 || hit.Module == 6 || hit.Module == 7 ||
-          hit.Module == 8 || hit.Module == 9) {
+      } else if (hitType == HitType::Neutron) {
         eventData.NeutronMultiplicity++;
       }
 
@@ -161,21 +173,18 @@ uint32_t TEventBuilder::EventBuild()
           break;
         }
 
-        if (nextHit.Module == 0) {
+        auto hitType = GetHitType(nextHit.Module);
+        if (hitType == HitType::SiFront) {
           eventData.SiMultiplicity++;
           eventData.SiFrontMultiplicity++;
-          frontADC = std::max(frontADC, nextHit.Energy);
-        }
-        if (nextHit.Module == 1) {
+          frontADC = std::max(frontADC, hit.Energy);
+        } else if (hitType == HitType::SiBack) {
           eventData.SiMultiplicity++;
           eventData.SiBackMultiplicity++;
-          backADC = std::max(backADC, nextHit.Energy);
-        }
-        if (nextHit.Module == 2 || nextHit.Module == 3 || nextHit.Module == 4) {
+          backADC = std::max(backADC, hit.Energy);
+        } else if (hitType == HitType::Gamma) {
           eventData.GammaMultiplicity++;
-        }
-        if (nextHit.Module == 5 || nextHit.Module == 6 || nextHit.Module == 7 ||
-            nextHit.Module == 8 || nextHit.Module == 9) {
+        } else if (hitType == HitType::Neutron) {
           eventData.NeutronMultiplicity++;
         }
 
@@ -198,22 +207,18 @@ uint32_t TEventBuilder::EventBuild()
           break;
         }
 
-        if (prevHit.Module == 0) {
+        auto hitType = GetHitType(prevHit.Module);
+        if (hitType == HitType::SiFront) {
           eventData.SiMultiplicity++;
           eventData.SiFrontMultiplicity++;
-          frontADC = std::max(frontADC, prevHit.Energy);
-        }
-        if (prevHit.Module == 1) {
+          frontADC = std::max(frontADC, hit.Energy);
+        } else if (hitType == HitType::SiBack) {
           eventData.SiMultiplicity++;
           eventData.SiBackMultiplicity++;
-          backADC = std::max(backADC, prevHit.Energy);
-        }
-        if (prevHit.Module == 2 || prevHit.Module == 3 || prevHit.Module == 4) {
+          backADC = std::max(backADC, hit.Energy);
+        } else if (hitType == HitType::Gamma) {
           eventData.GammaMultiplicity++;
-        }
-
-        if (prevHit.Module == 5 || prevHit.Module == 6 || prevHit.Module == 7 ||
-            prevHit.Module == 8 || prevHit.Module == 9) {
+        } else if (hitType == HitType::Neutron) {
           eventData.NeutronMultiplicity++;
         }
 

@@ -8,6 +8,15 @@
 #include "TChSettings.hpp"
 #include "TEventData.hpp"
 
+enum class HitType {
+  SiFront = 0,
+  SiBack = 1,
+  Gamma = 2,
+  Neutron = 3,
+  Unknown = 4,
+};
+typedef HitType HitType_t;
+
 class TEventBuilder
 {
  public:
@@ -35,6 +44,8 @@ class TEventBuilder
   std::vector<std::vector<TChSettings>> fSettings;
   double_t fTimeWindow = 1000.0;  // ns
   bool fOnlyFissionEvents = false;
+
+  HitType_t GetHitType(uint8_t module);
 };
 
 #endif

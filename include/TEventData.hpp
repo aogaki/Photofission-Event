@@ -27,7 +27,16 @@ typedef THitData HitData_t;
 class TEventData
 {
  public:
-  TEventData() {};
+  TEventData()
+  {
+    IsFissionEvent = false;
+    TriggerID = 0;
+    SiFrontMultiplicity = 0;
+    SiBackMultiplicity = 0;
+    SiMultiplicity = 0;
+    GammaMultiplicity = 0;
+    NeutronMultiplicity = 0;
+  };
   virtual ~TEventData() {};
 
   bool IsFissionEvent;
