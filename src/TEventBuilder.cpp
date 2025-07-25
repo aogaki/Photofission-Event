@@ -72,21 +72,29 @@ void TEventBuilder::CheckHitData()
   const double_t timeOffset = (pow(2, 47) - 1);
   const auto firstTS = fHitData.at(0).Timestamp;
   const auto lastTS = fHitData.at(fHitData.size() - 1).Timestamp;
-  if (lastTS - firstTS > timeOffset) {
-    std::cout << "Timestamp overflow detected: " << fFileName;
-    std::cout << "\nFirst timestamp: " << firstTS;
-    std::cout << "\nLast timestamp: " << lastTS << std::endl;
+  const auto duration = lastTS - firstTS;
 
-    for (auto i = 0; i < fHitData.size() - 1; i++) {
-      auto originalTS = fHitData.at(i).Timestamp;
-      if (fHitData.at(i).Module == 0 || fHitData.at(i).Module == 1) {
-        fHitData.at(i).Timestamp += timeOffset * 4;
-      } else {
-        fHitData.at(i).Timestamp += timeOffset * 2;
-      }
+  if (duration > timeOffset / 4) {
+    std::cout << "Rejected: " << fFileName << std::endl;
+    fHitData.clear();
+    return;
+  } else {
+    if (duration > timeOffset) {
+      std::cout << "Timestamp overflow detected: " << fFileName;
+      std::cout << "\nFirst timestamp: " << firstTS;
+      std::cout << "\nLast timestamp: " << lastTS << std::endl;
 
-      if (fHitData.at(i + 1).Timestamp - originalTS > timeOffset) {
-        break;
+      for (auto i = 0; i < fHitData.size() - 1; i++) {
+        auto originalTS = fHitData.at(i).Timestamp;
+        if (fHitData.at(i).Module == 0 || fHitData.at(i).Module == 1) {
+          fHitData.at(i).Timestamp += timeOffset * 4;
+        } else {
+          fHitData.at(i).Timestamp += timeOffset * 2;
+        }
+
+        if (fHitData.at(i + 1).Timestamp - originalTS > timeOffset) {
+          break;
+        }
       }
     }
   }
@@ -133,6 +141,7 @@ uint32_t TEventBuilder::EventBuild()
       eventData.SiMultiplicity = 0;
       eventData.GammaMultiplicity = 0;
       eventData.NeutronMultiplicity = 0;
+      eventData.TriggerTime = hit.Timestamp;
       uint16_t frontADC = 0;
       uint16_t backADC = 0;
 
@@ -155,19 +164,11 @@ uint32_t TEventBuilder::EventBuild()
       }
 
       eventData.TriggerID = fSettings.at(hit.Module).at(hit.Channel).detectorID;
-      bool fillFlag = true;
+      // bool fillFlag = true;
+      const bool fillFlag = true;
 
       for (auto jHit = iHit + 1; (jHit < nHits) && fillFlag; jHit++) {
         auto nextHit = fHitData.at(jHit);
-        if (fSettings.at(nextHit.Module).at(nextHit.Channel).isEventTrigger) {
-          auto detectorID =
-              fSettings.at(nextHit.Module).at(nextHit.Channel).detectorID;
-          if (detectorID > eventData.TriggerID) {
-            fillFlag = false;
-            break;
-          }
-        }
-
         nextHit.Timestamp -= triggerTime;
         if (nextHit.Timestamp > fTimeWindow) {
           break;
@@ -193,14 +194,6 @@ uint32_t TEventBuilder::EventBuild()
 
       for (auto jHit = iHit - 1; (jHit >= 0) && fillFlag; jHit--) {
         auto prevHit = fHitData.at(jHit);
-        if (fSettings.at(prevHit.Module).at(prevHit.Channel).isEventTrigger) {
-          auto detectorID =
-              fSettings.at(prevHit.Module).at(prevHit.Channel).detectorID;
-          if (detectorID > eventData.TriggerID) {
-            fillFlag = false;
-            break;
-          }
-        }
 
         prevHit.Timestamp -= triggerTime;
         if (prevHit.Timestamp < -fTimeWindow) {
@@ -236,6 +229,16 @@ uint32_t TEventBuilder::EventBuild()
           }
         } else {
           fEventData->push_back(eventData);
+        }
+      }
+
+      // go to the next hit candidate.
+      // it is triggerTime + fTimeWindow + fTimeWindow
+      const auto nextSearchTime = triggerTime + fTimeWindow + fTimeWindow;
+      for (; iHit < nHits; iHit++) {
+        auto nextHit = fHitData.at(iHit);
+        if (nextHit.Timestamp > nextSearchTime) {
+          break;
         }
       }
     }

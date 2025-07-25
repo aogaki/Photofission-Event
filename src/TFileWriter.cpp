@@ -8,6 +8,7 @@ TFileWriter::TFileWriter(std::string fileName)
   fTree = new TTree("Event_Tree", "Data tree");
   fTree->Branch("IsFissionEvent", &fIsFissionEvent);
   fTree->Branch("TriggerID", &fTriggerID);
+  fTree->Branch("TriggerTime", &fTriggerTime);
   fTree->Branch("SiFrontMultiplicity", &fSiFrontMultiplicity);
   fTree->Branch("SiBackMultiplicity", &fSiBackMultiplicity);
   fTree->Branch("SiMultiplicity", &fSiMultiplicity);
@@ -78,6 +79,7 @@ void TFileWriter::WriteData()
       for (auto &event : *localData) {
         fIsFissionEvent = event.IsFissionEvent;
         fTriggerID = event.TriggerID;
+        fTriggerTime = event.TriggerTime;
         fSiFrontMultiplicity = event.SiFrontMultiplicity;
         fSiBackMultiplicity = event.SiBackMultiplicity;
         fSiMultiplicity = event.SiMultiplicity;

@@ -121,7 +121,7 @@ void AnalysisThread(TString fileName, uint32_t threadID)
   tree->SetBranchStatus("Energy", kTRUE);
   tree->SetBranchAddress("Energy", &ADC);
 
-  const auto nEntries = tree->GetEntries() / 10;
+  const auto nEntries = tree->GetEntries();
   {
     std::lock_guard<std::mutex> lock(counterMutex);
     totalEvents += nEntries;

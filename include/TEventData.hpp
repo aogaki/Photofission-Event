@@ -46,6 +46,7 @@ class TEventData
   uint8_t SiMultiplicity;
   uint8_t GammaMultiplicity;
   uint8_t NeutronMultiplicity;
+  double_t TriggerTime;
   std::vector<HitData_t> HitData;
 };
 

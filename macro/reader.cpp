@@ -146,6 +146,30 @@ void AnalysisThread(TString fileName, uint32_t threadID)
   counterMutex.lock();
   auto settingsFileName = "./chSettings.json";
   auto chSettingsVec = TChSettings::GetChSettings(settingsFileName);
+  auto siTimeFunction = "Si_time_function.txt";
+  std::vector<double_t> p0Vec;
+  std::vector<double_t> p1Vec;
+  std::vector<double_t> p2Vec;
+  std::vector<double_t> p3Vec;
+  bool isSiTimeFunction = false;
+  std::ifstream ifs(siTimeFunction);
+  if (!ifs) {
+    std::cerr << "File not found: " << siTimeFunction << std::endl;
+  } else {
+    isSiTimeFunction = true;
+    std::string line;
+    while (std::getline(ifs, line)) {
+      std::istringstream iss(line);
+      int32_t ch;
+      double_t p0, p1, p2, p3;
+      iss >> ch >> p0 >> p1 >> p2 >> p3;
+      p0Vec.push_back(p0);
+      p1Vec.push_back(p1);
+      p2Vec.push_back(p2);
+      p3Vec.push_back(p3);
+    }
+  }
+  ifs.close();
   counterMutex.unlock();
 
   auto file = TFile::Open(fileName, "READ");
@@ -199,6 +223,24 @@ void AnalysisThread(TString fileName, uint32_t threadID)
     }
 
     if (IsFissionEvent) {
+      uint16_t SiEnergy = 0;
+      uint16_t SiCh = 0;
+      for (uint32_t j = 0; j < Module->size(); j++) {
+        auto module = Module->at(j);
+        auto timestamp = Timestamp->at(j);
+        if (module == 0 && timestamp == 0) {
+          SiCh = Channel->at(j);
+          SiEnergy = Energy->at(j);
+          break;
+        }
+      }
+      double SiTime = 0;
+      if (isSiTimeFunction) {
+        SiTime = p0Vec.at(SiCh) + p1Vec.at(SiCh) * SiEnergy +
+                 p2Vec.at(SiCh) * SiEnergy * SiEnergy +
+                 p3Vec.at(SiCh) * SiEnergy * SiEnergy * SiEnergy;
+      }
+
       histSiMultiplicty->Fill(SiMultiplicity);
       histGammaMultiplicity->Fill(GammaMultiplicity);
       histNeutronMultiplicity->Fill(NeutronMultiplicity);
@@ -207,7 +249,8 @@ void AnalysisThread(TString fileName, uint32_t threadID)
       for (uint32_t j = 0; j < Module->size(); j++) {
         auto module = Module->at(j);
         auto channel = Channel->at(j);
-        auto timestamp = Timestamp->at(j);
+        auto timestamp = Timestamp->at(j) + SiTime;
+        // auto timestamp = Timestamp->at(j);
         auto energy = Energy->at(j);
         auto energyShort = EnergyShort->at(j);
         auto chSetting = chSettingsVec.at(module).at(channel);

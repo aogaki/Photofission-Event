@@ -34,6 +34,7 @@ class TFileWriter
   // For tree branches
   bool fIsFissionEvent;
   uint8_t fTriggerID;
+  double_t fTriggerTime;
   uint8_t fSiFrontMultiplicity;
   uint8_t fSiBackMultiplicity;
   uint8_t fSiMultiplicity;
