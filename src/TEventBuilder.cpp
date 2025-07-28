@@ -31,6 +31,8 @@ uint32_t TEventBuilder::LoadHits()
   auto tree = dynamic_cast<TTree *>(file->Get("ELIADE_Tree"));
   if (!tree) {
     std::cout << "Tree not found: " << fFileName << std::endl;
+    file->Close();
+    delete file;
     return 0;
   }
   tree->SetBranchStatus("*", kFALSE);
@@ -117,6 +119,7 @@ HitType_t TEventBuilder::GetHitType(uint8_t module)
     return HitType::Neutron;
   } else {
     std::cout << "Unknown module: " << static_cast<int>(module) << std::endl;
+    return HitType::Unknown;
   }
   return HitType::Unknown;
 }
@@ -178,11 +181,11 @@ uint32_t TEventBuilder::EventBuild()
         if (hitType == HitType::SiFront) {
           eventData.SiMultiplicity++;
           eventData.SiFrontMultiplicity++;
-          frontADC = std::max(frontADC, hit.Energy);
+          frontADC = std::max(frontADC, nextHit.Energy);
         } else if (hitType == HitType::SiBack) {
           eventData.SiMultiplicity++;
           eventData.SiBackMultiplicity++;
-          backADC = std::max(backADC, hit.Energy);
+          backADC = std::max(backADC, nextHit.Energy);
         } else if (hitType == HitType::Gamma) {
           eventData.GammaMultiplicity++;
         } else if (hitType == HitType::Neutron) {
@@ -204,11 +207,11 @@ uint32_t TEventBuilder::EventBuild()
         if (hitType == HitType::SiFront) {
           eventData.SiMultiplicity++;
           eventData.SiFrontMultiplicity++;
-          frontADC = std::max(frontADC, hit.Energy);
+          frontADC = std::max(frontADC, prevHit.Energy);
         } else if (hitType == HitType::SiBack) {
           eventData.SiMultiplicity++;
           eventData.SiBackMultiplicity++;
-          backADC = std::max(backADC, hit.Energy);
+          backADC = std::max(backADC, prevHit.Energy);
         } else if (hitType == HitType::Gamma) {
           eventData.GammaMultiplicity++;
         } else if (hitType == HitType::Neutron) {
